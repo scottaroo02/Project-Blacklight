@@ -1,0 +1,38 @@
+name: Build Blacklight PRC
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Blacklight.c'
+      - 'Makefile'
+      - '.github/workflows/build-prc.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install prc-tools-remix
+        run: |
+          wget -q https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
+          sudo dpkg -i prc-tools-remix_2.3.6.jammy_amd64.deb
+
+      - name: Install Palm OS SDKs
+        run: |
+          sudo git clone --depth 1 https://github.com/jichu4n/palm-os-sdk.git /opt/palmdev
+          sudo palmdev-prep /opt/palmdev
+
+      - name: Build PRC
+        run: |
+          make clean || true
+          make
+          file Blacklight.prc
+          sha256sum Blacklight.prc
+
+      - name: Upload PRC artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Blacklight-Visor-Deluxe-PRC
+          path: Blacklight.prc
