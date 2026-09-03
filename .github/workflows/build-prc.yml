@@ -10,25 +10,49 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v5
 
       - name: Install prc-tools-remix
+        shell: bash
         run: |
-          wget -q https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
-          sudo dpkg -i prc-tools-remix_2.3.6.jammy_amd64.deb
+          set -euxo pipefail
+          wget https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
+          sudo apt-get update
+          sudo apt-get install -y ./prc-tools-remix_2.3.6.jammy_amd64.deb
 
       - name: Install Palm OS SDKs
+        shell: bash
         run: |
+          set -euxo pipefail
           sudo git clone --depth 1 https://github.com/jichu4n/palm-os-sdk.git /opt/palmdev
           sudo palmdev-prep /opt/palmdev
 
-      - name: Build PRC
+      - name: Verify Palm toolchain
+        shell: bash
         run: |
+          set -euxo pipefail
+          which m68k-palmos-gcc
+          which m68k-palmos-obj-res
+          which build-prc
+          m68k-palmos-gcc --version || true
+          palmdev-prep --help || true
+          find /opt/palmdev -maxdepth 2 -type d | sort | head -100
+          ls -la
+          cat Makefile
+
+      - name: Build PRC
+        shell: bash
+        run: |
+          set -euxo pipefail
           make clean || true
-          make
+          make V=1
+          test -f Blacklight.prc
           file Blacklight.prc
+          ls -lh Blacklight.prc
           sha256sum Blacklight.prc
 
       - name: Upload PRC artifact
@@ -36,3 +60,4 @@ jobs:
         with:
           name: Blacklight-Visor-Deluxe-PRC
           path: Blacklight.prc
+          if-no-files-found: error
