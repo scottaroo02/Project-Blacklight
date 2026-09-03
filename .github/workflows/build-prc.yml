@@ -3,61 +3,62 @@ name: Build Blacklight PRC
 on:
   workflow_dispatch:
   push:
-    paths:
-      - 'Blacklight.c'
-      - 'Makefile'
-      - '.github/workflows/build-prc.yml'
+    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-22.04
 
     steps:
-      - name: Checkout repository
+      - name: Checkout Project Blacklight
         uses: actions/checkout@v5
 
-      - name: Install prc-tools-remix
-        shell: bash
+      - name: Install build dependencies
         run: |
           set -euxo pipefail
-          wget -q https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
           sudo apt-get update
-          sudo apt-get install -y ./prc-tools-remix_2.3.6.jammy_amd64.deb
+          sudo apt-get install -y git curl ca-certificates make
 
-      - name: Install Palm OS SDKs
-        shell: bash
+      - name: Install prc-tools-remix
+        run: |
+          set -euxo pipefail
+          curl -L -o /tmp/prc-tools.deb             https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6-1_amd64.deb
+          sudo apt-get install -y /tmp/prc-tools.deb
+          command -v m68k-palmos-gcc
+          command -v palmdev-prep
+          m68k-palmos-gcc --version
+
+      - name: Install and register Palm OS SDK 3.1
         run: |
           set -euxo pipefail
           sudo rm -rf /opt/palmdev
-          sudo git clone --depth 1 https://github.com/jichu4n/palm-os-sdk.git /opt/palmdev
-          test -f /opt/palmdev/sdk-3.1/include/Pilot.h
-          sudo palmdev-prep -d 3.1 /opt/palmdev
+          sudo git clone --depth 1             https://github.com/jichu4n/palm-os-sdk.git             /opt/palmdev
 
-      - name: Verify Palm OS 3.1 toolchain
-        shell: bash
+          test -d /opt/palmdev/sdk-3.1/include/Core
+          test -f /opt/palmdev/sdk-3.1/include/header.gcc
+
+          echo "SDK 3.1 files:"
+          find /opt/palmdev/sdk-3.1/include -maxdepth 2 -type f | head -50
+
+          sudo palmdev-prep /opt/palmdev
+
+      - name: Build Blacklight PRC
         run: |
           set -euxo pipefail
-          which m68k-palmos-gcc
-          which m68k-palmos-obj-res
-          which build-prc
-          test -f /opt/palmdev/sdk-3.1/include/Pilot.h
-          grep -n '^#include' Blacklight.c | head
-          m68k-palmos-gcc -palmos3.1 -v -E -x c /dev/null >/dev/null
-
-      - name: Build PRC
-        shell: bash
-        run: |
-          set -euxo pipefail
-          make clean || true
+          echo "=== Blacklight.c header ==="
+          head -20 Blacklight.c
+          echo "=== Makefile ==="
+          cat Makefile
+          make clean
           make V=1
-          test -s Blacklight.prc
+          echo "=== Build output ==="
+          ls -lah
+          test -f Blacklight.prc
           file Blacklight.prc || true
-          ls -lh Blacklight.prc
-          sha256sum Blacklight.prc
 
-      - name: Upload PRC artifact
+      - name: Upload Blacklight PRC
         uses: actions/upload-artifact@v4
         with:
-          name: Blacklight-Visor-Deluxe-PRC
+          name: Blacklight-Visor-PRC
           path: Blacklight.prc
           if-no-files-found: error
