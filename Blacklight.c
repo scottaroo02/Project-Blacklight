@@ -1,4 +1,4 @@
-#include <PalmOS.h>
+#include <Pilot.h>
 
 #define CREATOR_ID 'BLKT'
 #define PREF_ID 1
