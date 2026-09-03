@@ -20,7 +20,7 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
-          wget https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
+          wget -q https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6.jammy_amd64.deb
           sudo apt-get update
           sudo apt-get install -y ./prc-tools-remix_2.3.6.jammy_amd64.deb
 
@@ -28,21 +28,21 @@ jobs:
         shell: bash
         run: |
           set -euxo pipefail
+          sudo rm -rf /opt/palmdev
           sudo git clone --depth 1 https://github.com/jichu4n/palm-os-sdk.git /opt/palmdev
-          sudo palmdev-prep /opt/palmdev
+          test -f /opt/palmdev/sdk-3.1/include/Pilot.h
+          sudo palmdev-prep -d 3.1 /opt/palmdev
 
-      - name: Verify Palm toolchain
+      - name: Verify Palm OS 3.1 toolchain
         shell: bash
         run: |
           set -euxo pipefail
           which m68k-palmos-gcc
           which m68k-palmos-obj-res
           which build-prc
-          m68k-palmos-gcc --version || true
-          palmdev-prep --help || true
-          find /opt/palmdev -maxdepth 2 -type d | sort | head -100
-          ls -la
-          cat Makefile
+          test -f /opt/palmdev/sdk-3.1/include/Pilot.h
+          grep -n '^#include' Blacklight.c | head
+          m68k-palmos-gcc -palmos3.1 -v -E -x c /dev/null >/dev/null
 
       - name: Build PRC
         shell: bash
@@ -50,8 +50,8 @@ jobs:
           set -euxo pipefail
           make clean || true
           make V=1
-          test -f Blacklight.prc
-          file Blacklight.prc
+          test -s Blacklight.prc
+          file Blacklight.prc || true
           ls -lh Blacklight.prc
           sha256sum Blacklight.prc
 
