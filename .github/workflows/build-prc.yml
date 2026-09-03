@@ -17,44 +17,101 @@ jobs:
         run: |
           set -euxo pipefail
           sudo apt-get update
-          sudo apt-get install -y git curl ca-certificates make
+          sudo apt-get install -y git curl ca-certificates make jq file
 
       - name: Install prc-tools-remix
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euxo pipefail
-          curl -L -o /tmp/prc-tools.deb             https://github.com/jichu4n/prc-tools-remix/releases/download/v2.3.6/prc-tools-remix_2.3.6-1_amd64.deb
+
+          API_URL="https://api.github.com/repos/jichu4n/prc-tools-remix/releases/tags/v2.3.6"
+
+          echo "=== Available v2.3.6 release assets ==="
+          curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "${API_URL}" \
+            | jq -r '.assets[] | "\(.name)\t\(.browser_download_url)"' \
+            | tee /tmp/prc-assets.txt
+
+          DEB_URL="$(
+            awk -F '\t' '
+              tolower($1) ~ /(amd64|x86_64)/ &&
+              tolower($1) ~ /\.deb$/ {
+                print $2
+                exit
+              }
+            ' /tmp/prc-assets.txt
+          )"
+
+          if [ -z "${DEB_URL}" ]; then
+            echo "::error::No amd64/x86_64 .deb asset was found in prc-tools-remix v2.3.6."
+            echo "Assets returned by GitHub:"
+            cat /tmp/prc-assets.txt
+            exit 1
+          fi
+
+          echo "Downloading: ${DEB_URL}"
+          curl --fail --location --retry 3 \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -o /tmp/prc-tools.deb \
+            "${DEB_URL}"
+
+          echo "=== Download verification ==="
+          ls -lh /tmp/prc-tools.deb
+          file /tmp/prc-tools.deb
+          dpkg-deb --info /tmp/prc-tools.deb | head -40
+
           sudo apt-get install -y /tmp/prc-tools.deb
+
+          echo "=== Installed Palm tools ==="
           command -v m68k-palmos-gcc
           command -v palmdev-prep
+          command -v m68k-palmos-obj-res || true
+          command -v build-prc || true
           m68k-palmos-gcc --version
 
       - name: Install and register Palm OS SDK 3.1
         run: |
           set -euxo pipefail
+
           sudo rm -rf /opt/palmdev
-          sudo git clone --depth 1             https://github.com/jichu4n/palm-os-sdk.git             /opt/palmdev
+          sudo git clone --depth 1 \
+            https://github.com/jichu4n/palm-os-sdk.git \
+            /opt/palmdev
+
+          echo "=== SDK 3.1 structure ==="
+          find /opt/palmdev/sdk-3.1 -maxdepth 2 -type d | sort | head -50
+          find /opt/palmdev/sdk-3.1/include -maxdepth 2 -type f | sort | head -80
 
           test -d /opt/palmdev/sdk-3.1/include/Core
           test -f /opt/palmdev/sdk-3.1/include/header.gcc
 
-          echo "SDK 3.1 files:"
-          find /opt/palmdev/sdk-3.1/include -maxdepth 2 -type f | head -50
-
           sudo palmdev-prep /opt/palmdev
+
+          echo "=== SDK registration complete ==="
 
       - name: Build Blacklight PRC
         run: |
           set -euxo pipefail
-          echo "=== Blacklight.c header ==="
-          head -20 Blacklight.c
+
+          echo "=== Source header ==="
+          head -30 Blacklight.c
+
           echo "=== Makefile ==="
           cat Makefile
+
           make clean
           make V=1
+
           echo "=== Build output ==="
           ls -lah
+
           test -f Blacklight.prc
-          file Blacklight.prc || true
+          file Blacklight.prc
+          sha256sum Blacklight.prc
 
       - name: Upload Blacklight PRC
         uses: actions/upload-artifact@v4
