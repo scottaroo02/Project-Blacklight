@@ -150,12 +150,18 @@ static void DrawStage(void) {
             break;
 
         case 6:
-            Center("MANUAL OVERRIDE", 45);
-            Center("SOFTWARE INPUT OFF", 62);
-            Center("Use the four hard keys.", 80);
-            Center("Find the override", 96);
-            Center("sequence elsewhere.", 109);
-            Center("Waiting...", 128);
+            Center("MANUAL OVERRIDE", 42);
+            Center("Enter override sequence", 58);
+            Center("using the buttons below.", 71);
+            Center("Find the sequence elsewhere.", 84);
+            Button(10, 105, 29, 25, "1");
+            Button(47, 105, 29, 25, "2");
+            Button(84, 105, 29, 25, "3");
+            Button(121, 105, 29, 25, "4");
+            if (g.hwIndex == 0) Center("_ _ _ _", 139);
+            else if (g.hwIndex == 1) Center("* _ _ _", 139);
+            else if (g.hwIndex == 2) Center("* * _ _", 139);
+            else if (g.hwIndex == 3) Center("* * * _", 139);
             break;
 
         case 7:
@@ -205,16 +211,56 @@ static void ResetInput(void) {
     inputBuf[0] = 0;
 }
 
+
+static void PlaySuccessJingle(void) {
+    static const Word notes[] = {659, 784, 1047};
+    static const Word durations[] = {90, 90, 180};
+    Word i;
+    SndCommandType cmd;
+
+    MemSet(&cmd, sizeof(cmd), 0);
+    cmd.cmd = sndCmdFreqDurationAmp;
+    cmd.param3 = sndMaxAmp;
+
+    for (i = 0; i < (sizeof(notes) / sizeof(notes[0])); i++) {
+        cmd.param1 = notes[i];
+        cmd.param2 = durations[i];
+        SndDoCmd(NULL, &cmd, false);
+    }
+}
+
+static void PlayVictoryMelody(void) {
+    static const Word notes[] = {523, 659, 784, 1047, 784, 1047, 1319, 1568};
+    static const Word durations[] = {140, 140, 160, 240, 120, 160, 180, 420};
+    Word i;
+    SndCommandType cmd;
+
+    MemSet(&cmd, sizeof(cmd), 0);
+    cmd.cmd = sndCmdFreqDurationAmp;
+    cmd.param3 = sndMaxAmp;
+
+    for (i = 0; i < (sizeof(notes) / sizeof(notes[0])); i++) {
+        cmd.param1 = notes[i];
+        cmd.param2 = durations[i];
+        SndDoCmd(NULL, &cmd, false);
+    }
+}
+
 static void Advance(void) {
+    Byte oldStage = g.stage;
+
     g.stage++;
     ResetInput();
     SaveState();
     DrawStage();
+
+    if (oldStage == 9)
+        PlayVictoryMelody();
 }
 
 static void CheckCode(const Char *code) {
     if (StrCompare(inputBuf, code) == 0) {
-        SndPlaySystemSound(sndInfo);
+        PlaySuccessJingle();
         Advance();
     } else {
         SndPlaySystemSound(sndError);
@@ -254,7 +300,10 @@ static Boolean HandlePen(SWord x, SWord y) {
         if (IsInside(x, y, 28, 88, 104, 20)) {
             if (g.stage < 10)
                 g.stage++;
+            g.hwIndex = 0;
+            ResetInput();
             SaveState();
+            adminMode = false;
             DrawStage();
             return true;
         }
@@ -297,6 +346,37 @@ static Boolean HandlePen(SWord x, SWord y) {
         if (IsInside(x, y, 83, 91, 58, 22) ||
             IsInside(x, y, 51, 121, 58, 22)) {
             SndPlaySystemSound(sndError);
+            return true;
+        }
+    }
+
+    if (g.stage == 6) {
+        Byte pressed = 0;
+        static const Byte seq[4] = {3, 1, 4, 2};
+
+        if (IsInside(x, y, 10, 105, 29, 25)) pressed = 1;
+        else if (IsInside(x, y, 47, 105, 29, 25)) pressed = 2;
+        else if (IsInside(x, y, 84, 105, 29, 25)) pressed = 3;
+        else if (IsInside(x, y, 121, 105, 29, 25)) pressed = 4;
+
+        if (pressed) {
+            if (pressed == seq[g.hwIndex]) {
+                g.hwIndex++;
+                if (g.hwIndex >= 4) {
+                    g.hwIndex = 0;
+                    PlaySuccessJingle();
+                    Advance();
+                } else {
+                    SndPlaySystemSound(sndClick);
+                    SaveState();
+                    DrawStage();
+                }
+            } else {
+                g.hwIndex = 0;
+                SaveState();
+                SndPlaySystemSound(sndError);
+                DrawStage();
+            }
             return true;
         }
     }
@@ -345,35 +425,8 @@ static Boolean HandlePen(SWord x, SWord y) {
 }
 
 static Boolean HandleHardKey(Word chr) {
-    static const Word seq[4] = {
-        vchrHard3,
-        vchrHard1,
-        vchrHard4,
-        vchrHard2
-    };
-
-    if (g.stage != 6)
-        return false;
-
-    if (chr == seq[g.hwIndex]) {
-        g.hwIndex++;
-
-        if (g.hwIndex >= 4) {
-            g.hwIndex = 0;
-            Advance();
-        } else {
-            SndPlaySystemSound(sndClick);
-        }
-    } else if (chr == vchrHard1 ||
-               chr == vchrHard2 ||
-               chr == vchrHard3 ||
-               chr == vchrHard4) {
-        g.hwIndex = 0;
-        SndPlaySystemSound(sndError);
-        DrawStage();
-    }
-
-    return true;
+    (void)chr;
+    return false;
 }
 
 static void EventLoop(void) {
