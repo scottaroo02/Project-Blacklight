@@ -71,23 +71,23 @@ static void DrawKeypad(void) {
     for (row = 0; row < 3; row++) {
         for (col = 0; col < 3; col++) {
             s[0] = '0' + n++;
-            Button(28 + col * 36, 67 + row * 23, 30, 19, s);
+            Button(28 + col * 36, 72 + row * 21, 30, 18, s);
         }
     }
 
-    Button(64, 136, 30, 19, "0");
+    Button(64, 137, 30, 18, "0");
 }
 
 static void DrawInput(void) {
     RectangleType r;
 
-    RctSetRectangle(&r, 49, 46, 62, 16);
+    RctSetRectangle(&r, 49, 52, 62, 16);
     WinDrawRectangle(&r, 0);
 
-    RctSetRectangle(&r, 50, 47, 60, 14);
+    RctSetRectangle(&r, 50, 53, 60, 14);
     WinEraseRectangle(&r, 0);
 
-    Center(inputBuf, 49);
+    Center(inputBuf, 55);
 }
 
 static void DrawStage(void) {
@@ -111,7 +111,6 @@ static void DrawStage(void) {
 
         case 1:
             Center("CARD INDEX", 39);
-            Center("Enter four digits:", 52);
             DrawInput();
             DrawKeypad();
             break;
@@ -126,7 +125,6 @@ static void DrawStage(void) {
 
         case 3:
             Center("UV AUTHENTICATION", 39);
-            Center("Enter access code:", 52);
             DrawInput();
             DrawKeypad();
             break;
@@ -177,7 +175,6 @@ static void DrawStage(void) {
 
         case 8:
             Center("TRANSMISSION VERIFY", 39);
-            Center("Enter video code:", 52);
             DrawInput();
             DrawKeypad();
             break;
@@ -230,8 +227,9 @@ static void PlaySuccessJingle(void) {
 }
 
 static void PlayVictoryMelody(void) {
-    static const Word notes[] = {523, 659, 784, 1047, 784, 1047, 1319, 1568};
-    static const Word durations[] = {140, 140, 160, 240, 120, 160, 180, 420};
+    /* Original dramatic countdown-style victory fanfare. */
+    static const Word notes[] = {392, 392, 523, 494, 392, 330, 349, 392, 523, 659, 622, 523, 784};
+    static const Word durations[] = {120, 120, 220, 120, 180, 120, 120, 220, 140, 180, 140, 180, 420};
     Word i;
     SndCommandType cmd;
 
@@ -391,14 +389,14 @@ static Boolean HandlePen(SWord x, SWord y) {
             for (col = 0; col < 3; col++) {
                 if (IsInside(x, y,
                              28 + col * 36,
-                             67 + row * 23,
-                             30, 19)) {
+                             72 + row * 21,
+                             30, 18)) {
                     digit = 1 + row * 3 + col;
                 }
             }
         }
 
-        if (IsInside(x, y, 64, 136, 30, 19))
+        if (IsInside(x, y, 64, 137, 30, 18))
             digit = 10;
 
         if (digit && inputLen < 4) {
